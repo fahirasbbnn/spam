@@ -43,12 +43,12 @@ def clean_message(message):
 
 # Streamlit app layout
 st.title("SMS Spam Classifier")
-st.markdown("This is a simple SMS spam classifier built using Naive Bayes and NLP.")
+st.markdown("Ini adalah aplikasi untuk mengklasifikasi pesan Spam atau Ham.")
 
 # Get user input (SMS message)
-user_input = st.text_area("Enter your message:")
+user_input = st.text_area("Masukkan Pesan Yang Anda Terima:")
 
-if st.button("Predict"):
+if st.button("Prediksi"):
     # Clean the user input message
     cleaned_input = clean_message(user_input)
 
@@ -59,7 +59,7 @@ if st.button("Predict"):
     prediction = classifier.predict(input_vector)
     
     if prediction == 1:
-        st.write("Prediction: This is a **Spam** message.")
+        st.write("Prediksi: Ini Adalah Pesan **Spam**.")
     else:
-        st.write("Prediction: This is a **Ham** message (Not Spam).")
+        st.write("Prediction: Ini Adalah Pesan **Ham** (Bukan Spam).")
 
