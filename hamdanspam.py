@@ -1,65 +1,78 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-import pickle
-import nltk
-import re
-from nltk.corpus import stopwords
-from nltk.stem.porter import PorterStemmer
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.naive_bayes import MultinomialNB
 
-# Download necessary NLTK resources
-nltk.download('stopwords')
+# Memuat dataset yang sudah dibersihkan
+df = pd.read_csv('Supermarket Sales Cleaned.csv')
 
-# Load the trained model and CountVectorizer from pickle files
-cv = pickle.load(open('cv-transform.pkl', 'rb'))
-classifier = pickle.load(open('spam-sms-mnb-model.pkl', 'rb'))
+# Membersihkan nama kolom untuk menghindari masalah dengan spasi yang tidak terlihat
+df.columns = df.columns.str.strip()
 
-# Initialize a PorterStemmer
-ps = PorterStemmer()
+# Periksa nama-nama kolom yang ada dalam dataset
+st.write(df.columns)  # Menampilkan nama kolom
 
-# Function to clean the message before prediction
-def clean_message(message):
-    # Cleaning special character from the message
-    message = re.sub(pattern='[^a-zA-Z]', repl=' ', string=message)
+# Jika kolom 'Product line' tidak ada, tampilkan pesan kesalahan
+if 'Product line' not in df.columns:
+    st.error("Kolom 'Product line' tidak ditemukan dalam dataset!")
+else:
+    # Fungsi untuk mengklasifikasikan product line berdasarkan nama produk
+    def classify_product_line(product_name):
+        product_line = df[df['Product'].str.contains(product_name, case=False, na=False)]['Product line'].unique()
+        return product_line
 
-    # Converting the entire message into lower case
-    message = message.lower()
+    # Fungsi untuk menghitung jumlah pembelian berdasarkan product line dan kota
+    def count_purchases_by_product_line_and_city(product_line, city):
+        count = df[(df['Product line'] == product_line) & (df['City'] == city)].shape[0]
+        return count
 
-    # Tokenizing the review by words
-    words = message.split()
+    # Fungsi untuk mendapatkan rating berdasarkan product line dan kota
+    def get_ratings_by_product_line_and_city(product_line, city):
+        ratings = df[(df['Product line'] == product_line) & (df['City'] == city)]['Rating']
+        return ratings
 
-    # Removing the stop words
-    words = [word for word in words if word not in set(stopwords.words('english'))]
+    # Fungsi untuk mendapatkan metode pembayaran berdasarkan product line dan kota
+    def get_payments_by_product_line_and_city(product_line, city):
+        payments = df[(df['Product line'] == product_line) & (df['City'] == city)]['Payment'].value_counts()
+        return payments
 
-    # Stemming the words
-    words = [ps.stem(word) for word in words]
+    # Fungsi untuk mendapatkan detail product line tertentu
+    def get_product_line_details(product_line):
+        total_purchases = df[df['Product line'] == product_line].shape[0]
+        payment_methods = df[df['Product line'] == product_line]['Payment'].value_counts()
+        cities = df[df['Product line'] == product_line]['City'].value_counts()
+        ratings = df[df['Product line'] == product_line]['Rating'].describe()
+        return total_purchases, payment_methods, cities, ratings
 
-    # Joining the stemmed words
-    cleaned_message = ' '.join(words)
-    
-    return cleaned_message
+    # Antarmuka Streamlit
+    st.title('Aplikasi Klasifikasi Product Line dan Analisis Pembelian')
 
-# Streamlit app layout
-st.title("SMS Spam Classifier")
-st.markdown("Ini adalah aplikasi untuk mengklasifikasi pesan Spam atau Ham.")
+    product_name = st.text_input('Masukkan nama produk:')
+    city = st.selectbox('Pilih kota:', df['City'].unique())
+    product_line = st.selectbox('Pilih product line:', df['Product line'].unique())
 
-# Get user input (SMS message)
-user_input = st.text_area("Masukkan Pesan Yang Anda Terima:")
+    if product_name:
+        classified_product_line = classify_product_line(product_name)
+        if classified_product_line.size > 0:
+            st.write(f'Product line untuk "{product_name}" adalah: {classified_product_line[0]}')
+            
+            purchase_count = count_purchases_by_product_line_and_city(classified_product_line[0], city)
+            st.write(f'Jumlah pembelian untuk product line "{classified_product_line[0]}" di {city} adalah: {purchase_count}')
+            
+            ratings = get_ratings_by_product_line_and_city(classified_product_line[0], city)
+            st.write(f'Rating untuk product line "{classified_product_line[0]}" di {city}:')
+            st.write(ratings.describe())
+            
+            payments = get_payments_by_product_line_and_city(classified_product_line[0], city)
+            st.write(f'Metode pembayaran untuk product line "{classified_product_line[0]}" di {city}:')
+            st.write(payments)
+        else:
+            st.write(f'Tidak ditemukan product line untuk "{product_name}"')
 
-if st.button("Prediksi"):
-    # Clean the user input message
-    cleaned_input = clean_message(user_input)
-
-    # Convert the cleaned input to a bag of words using the trained CountVectorizer
-    input_vector = cv.transform([cleaned_input]).toarray()
-
-    # Predict whether the message is spam or ham (not spam)
-    prediction = classifier.predict(input_vector)
-    
-    if prediction == 1:
-        st.write("Prediksi: Ini Adalah Pesan **Spam**.")
-    else:
-        st.write("Prediction: Ini Adalah Pesan **Ham** (Bukan Spam).")
-
+    if product_line:
+        total_purchases, payment_methods, cities, ratings = get_product_line_details(product_line)
+        st.write(f'Total pembelian untuk product line "{product_line}": {total_purchases}')
+        st.write(f'Metode pembayaran untuk product line "{product_line}":')
+        st.write(payment_methods)
+        st.write(f'Kota dengan pembelian terbanyak untuk product line "{product_line}":')
+        st.write(cities)
+        st.write(f'Rating untuk product line "{product_line}":')
+        st.write(ratings)
